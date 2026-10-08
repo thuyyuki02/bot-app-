@@ -1,0 +1,7 @@
+{
+  "name": "Đệm Xanh AI Assistant",
+  "description": "Nền tảng AI Sales & Chăm sóc khách hàng cho Đệm Xanh (demxanh.com) - Tư vấn đệm thông minh, thu thập lead và quản trị tập trung.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
