@@ -32,6 +32,7 @@ import {
   INITIAL_AUDIT_LOGS,
   INITIAL_FAILED_QUESTIONS,
 } from '../data/mockData';
+import { askDemXanhAI } from '../services/aiClient';
 
 interface AppContextType {
   // Navigation
@@ -258,21 +259,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
 
-    // Call AI backend route
+    // Call AI consultation engine
     try {
-      const response = await fetch('/api/ai/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const data = await askDemXanhAI(
+        {
           message: text,
           history: (targetConv?.messages || []).slice(-6),
           systemPrompt: aiConfig.systemPrompt,
           currentPageContext: `${currentPage} (Sản phẩm đang xem: ${currentPageTitle || 'Trang chủ Đệm Xanh'})`,
           customerProfile: targetConv?.consultationData,
-        }),
-      });
+          catalog: products,
+        },
+        products
+      );
 
-      const data = await response.json();
       const replyText = data.text || 'Dạ em có thể hỗ trợ anh/chị chọn đệm phù hợp hoặc xem ưu đãi tại showroom Đệm Xanh ạ!';
       const detectedIntent = data.detectedIntent || 'Tư vấn đệm';
       const scoreInc = data.scoreIncrement || 10;

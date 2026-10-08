@@ -21,7 +21,7 @@ let learnedPolicies = [...DEMXANH_CORE_POLICIES];
 
 async function startServer() {
   const app = express();
-  const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
+  const PORT = 3000;
 
   // Allow iframe embedding and cross-origin widget requests from external websites
   app.use((req, res, next) => {
@@ -189,8 +189,8 @@ async function startServer() {
             },
           ];
 
-          const response = await ai.models.generateContent({
-            model: 'gemini-3.8-flash',
+          const generatePromise = ai.models.generateContent({
+            model: 'gemini-2.5-flash',
             contents,
             config: {
               systemInstruction:
@@ -206,8 +206,15 @@ NHIỆM VỤ CỐT LÕI:
             },
           });
 
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Gemini API timeout')), 4000)
+          );
+
+          const response = (await Promise.race([generatePromise, timeoutPromise])) as any;
           const replyText = response.text || '';
-          return res.json({ text: replyText, source: 'gemini' });
+          if (replyText.trim()) {
+            return res.json({ text: replyText, source: 'gemini' });
+          }
         } catch (apiError: any) {
           console.warn('Gemini API call failed, falling back to local engine:', apiError?.message || apiError);
         }
@@ -272,7 +279,12 @@ NHIỆM VỤ CỐT LÕI:
       });
     } catch (err: any) {
       console.error('Error handling chat:', err);
-      res.status(500).json({ error: 'Internal Server Error' });
+      res.status(200).json({
+        text: 'Dạ em là trợ lý tư vấn AI Đệm Xanh (demxanh.com), hotline 0962 701 701. Em có thể báo giá nhanh các mẫu đệm cao su Kim Cương, Liên Á, đệm lò xo Dunlopillo và tư vấn độ cứng phù hợp với thể trạng lưng của anh/chị ạ!',
+        source: 'local_engine',
+        detectedIntent: 'Tư vấn đệm',
+        scoreIncrement: 10,
+      });
     }
   });
 

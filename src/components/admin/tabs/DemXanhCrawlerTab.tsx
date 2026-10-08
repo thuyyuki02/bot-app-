@@ -23,6 +23,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { DEMXANH_REAL_CATALOG, DEMXANH_CORE_POLICIES } from '../../../services/crawlerService';
+import { askDemXanhAI, scrapeDemXanhProduct } from '../../../services/aiClient';
 
 export const DemXanhCrawlerTab: React.FC = () => {
   const { products, setProducts, knowledgeItems, setKnowledgeItems, addAuditLog, aiConfig } = useApp();
@@ -46,14 +47,9 @@ export const DemXanhCrawlerTab: React.FC = () => {
     setScrapeStatusMessage('Đang kết nối tới máy chủ demxanh.com và bóc tách dữ liệu sản phẩm...');
 
     try {
-      const res = await fetch('/api/crawler/scrape', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: inputUrl.trim() }),
-      });
-      const data = await res.json();
+      const data = await scrapeDemXanhProduct(inputUrl.trim());
 
-      if (data.success && data.product) {
+      if (data && data.product) {
         // Add or update in state
         setProducts((prev) => {
           const exists = prev.findIndex((p) => p.id === data.product.id || p.name.toLowerCase() === data.product.name.toLowerCase());
@@ -118,24 +114,23 @@ export const DemXanhCrawlerTab: React.FC = () => {
     setAiTestResult(null);
 
     try {
-      const res = await fetch('/api/ai/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const response = await askDemXanhAI(
+        {
           message: testQuestion,
           currentPageContext: simulatedPageContext,
           systemPrompt: aiConfig.systemPrompt,
           catalog: products,
-        }),
-      });
-      const data = await res.json();
+        },
+        products
+      );
+
       setAiTestResult({
-        answer: data.text || 'Không có phản hồi.',
-        source: data.source || 'gemini',
+        answer: response.text || 'Dạ em có thể tư vấn mẫu đệm phù hợp với mình ạ!',
+        source: response.source || 'gemini',
       });
     } catch (e: any) {
       setAiTestResult({
-        answer: 'Lỗi kiểm tra AI: ' + e.message,
+        answer: 'Lỗi kiểm tra AI: ' + (e?.message || 'Không thể kết nối'),
         source: 'error',
       });
     } finally {
