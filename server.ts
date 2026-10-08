@@ -190,7 +190,7 @@ async function startServer() {
           ];
 
           const generatePromise = ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-3.8-flash',
             contents,
             config: {
               systemInstruction:
@@ -207,7 +207,7 @@ NHIỆM VỤ CỐT LÕI:
           });
 
           const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Gemini API timeout')), 4000)
+            setTimeout(() => reject(new Error('Gemini API timeout')), 9000)
           );
 
           const response = (await Promise.race([generatePromise, timeoutPromise])) as any;
