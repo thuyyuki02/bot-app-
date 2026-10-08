@@ -38,6 +38,8 @@ export interface Product {
   image: string;
   features: string[];
   description: string;
+  url?: string;
+  source?: string;
   aiSettings: {
     aiEnabled: boolean;
     suitableFor: ('Bản thân' | 'Vợ/chồng' | 'Người lớn tuổi' | 'Trẻ em' | 'Khách sạn')[];

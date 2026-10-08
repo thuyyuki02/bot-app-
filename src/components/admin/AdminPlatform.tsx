@@ -47,13 +47,17 @@ import {
   Network,
   Cpu,
   FolderTree,
+  DownloadCloud,
 } from 'lucide-react';
 import { DatabaseSchemaTab } from './tabs/DatabaseSchemaTab';
 import { AiPlaygroundTab } from './tabs/AiPlaygroundTab';
 import { ApiArchitectureTab } from './tabs/ApiArchitectureTab';
 import { CodeArchitectureTab } from './tabs/CodeArchitectureTab';
+import { IntegrationsEmbedTab } from './tabs/IntegrationsEmbedTab';
+import { DemXanhCrawlerTab } from './tabs/DemXanhCrawlerTab';
 
 type AdminTab =
+  | 'crawler'
   | 'dashboard'
   | 'playground'
   | 'database_schema'
@@ -106,7 +110,7 @@ export const AdminPlatform: React.FC = () => {
     addAuditLog,
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
+  const [activeTab, setActiveTab] = useState<AdminTab>('crawler');
 
   // Search and filter states
   const [productSearch, setProductSearch] = useState('');
@@ -189,6 +193,8 @@ export const AdminPlatform: React.FC = () => {
         {/* Navigation Items */}
         <nav className="flex-1 overflow-y-auto p-2 space-y-0.5 text-xs font-semibold">
           {[
+            { id: 'crawler', label: 'Cào Dữ Liệu DemXanh.com ★', icon: DownloadCloud },
+            { id: 'integrations', label: 'D23 Mã Nhúng Website ★', icon: Code },
             { id: 'dashboard', label: 'D01 Dashboard', icon: LayoutDashboard },
             { id: 'playground', label: 'AI Training Playground ★', icon: Cpu },
             { id: 'database_schema', label: 'Database Schema & DDL ★', icon: Database },
@@ -206,7 +212,6 @@ export const AdminPlatform: React.FC = () => {
             { id: 'quality', label: 'D19 AI Quality & Gap', icon: Sparkles },
             { id: 'staff', label: 'D16 Nhân sự & Phân quyền', icon: UserCheck },
             { id: 'appearance', label: 'D20 Giao diện Chatbot', icon: Palette },
-            { id: 'integrations', label: 'D23 Tích hợp & Nhúng Web', icon: Code },
             { id: 'audit', label: 'D26 Nhật ký Audit Log', icon: History },
           ].map((item) => {
 
@@ -405,6 +410,9 @@ export const AdminPlatform: React.FC = () => {
             </div>
           </div>
         )}
+
+        {/* TAB: DEMXANH CRAWLER & AI TRAINING */}
+        {activeTab === 'crawler' && <DemXanhCrawlerTab />}
 
         {/* TAB: PLAYGROUND */}
         {activeTab === 'playground' && <AiPlaygroundTab />}
@@ -1219,74 +1227,7 @@ export const AdminPlatform: React.FC = () => {
         )}
 
         {/* TAB 11: D23-D24 INTEGRATIONS & EMBED SCRIPT */}
-        {activeTab === 'integrations' && (
-          <div className="space-y-5 max-w-4xl mx-auto w-full">
-            <div>
-              <h2 className="text-xl font-black text-white">
-                D23 — Tích Hợp Hệ Thống & Mã Nhúng Website
-              </h2>
-              <p className="text-xs text-slate-400">
-                Kết nối Product API, CRM, Zalo OA và mã nhúng cho website demxanh.com
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {[
-                { name: 'Website demxanh.com', status: 'Đã kết nối', color: 'text-emerald-400' },
-                { name: 'Product Inventory API', status: 'Đã kết nối', color: 'text-emerald-400' },
-                { name: 'Hệ thống Quản lý Đơn hàng', status: 'Đang đồng bộ', color: 'text-amber-400' },
-                { name: 'Google Analytics 4', status: 'Đã kết nối', color: 'text-emerald-400' },
-                { name: 'Zalo Official Account', status: 'Sẵn sàng tích hợp', color: 'text-slate-400' },
-                { name: 'HubSpot / KiotViet CRM', status: 'Sẵn sàng tích hợp', color: 'text-slate-400' },
-              ].map((item, i) => (
-                <div
-                  key={i}
-                  className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex items-center justify-between text-xs"
-                >
-                  <span className="font-semibold text-slate-200">{item.name}</span>
-                  <span className={`font-bold flex items-center gap-1 ${item.color}`}>
-                    <CheckCircle className="w-3.5 h-3.5" />
-                    <span>{item.status}</span>
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            {/* D24: Website Installation Widget Script */}
-            <div className="bg-slate-950 p-6 rounded-3xl border border-slate-800 space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-bold text-sm text-white">
-                    D24 — Mã Nhúng Widget Đệm Xanh AI
-                  </h3>
-                  <p className="text-xs text-slate-400">
-                    Dán đoạn mã script này vào trước thẻ &lt;/body&gt; trên demxanh.com
-                  </p>
-                </div>
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(
-                      `<script src="https://ai.demxanh.com/widget.js" data-site-id="demxanh" async></script>`
-                    );
-                    alert('Đã sao chép mã script nhúng vào clipboard!');
-                  }}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3.5 py-1.5 rounded-xl transition"
-                >
-                  Sao chép Script
-                </button>
-              </div>
-
-              <pre className="bg-slate-900 p-4 rounded-2xl border border-slate-800 text-xs font-mono text-emerald-400 overflow-x-auto">
-{`<script
-  src="https://ai.demxanh.com/widget.js"
-  data-site-id="demxanh"
-  data-theme="emerald"
-  async>
-</script>`}
-              </pre>
-            </div>
-          </div>
-        )}
+        {activeTab === 'integrations' && <IntegrationsEmbedTab />}
 
         {/* TAB 12: D26 AUDIT LOG */}
         {activeTab === 'audit' && (

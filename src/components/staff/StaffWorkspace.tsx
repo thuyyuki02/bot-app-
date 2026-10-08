@@ -20,6 +20,8 @@ import {
   Sparkles,
   AlertCircle,
   Smartphone,
+  Globe,
+  ExternalLink,
 } from 'lucide-react';
 
 export const StaffWorkspace: React.FC = () => {
@@ -214,6 +216,13 @@ export const StaffWorkspace: React.FC = () => {
                     <div className="text-xs text-slate-400 line-clamp-1 break-words">
                       {lastMsg?.text || 'Bắt đầu cuộc trò chuyện'}
                     </div>
+
+                    {conv.currentProduct && (
+                      <div className="flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-900/60 truncate font-medium">
+                        <Globe className="w-2.5 h-2.5 shrink-0 text-emerald-400" />
+                        <span className="truncate">Đang xem: {conv.currentProduct}</span>
+                      </div>
+                    )}
 
                     <div className="flex items-center justify-between text-[11px] text-slate-500 pt-0.5">
                       <span className="text-slate-400 truncate max-w-[140px]">
@@ -478,6 +487,39 @@ export const StaffWorkspace: React.FC = () => {
                     >
                       {activeConv.leadTier === 'HOT' ? '🔥 HOT LEAD (Mua ngay)' : '🟡 TIỀM NĂNG'}
                     </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Trang & Sản phẩm khách đang xem trên demxanh.com */}
+              <div>
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+                  <span>Trang Khách Đang Xem</span>
+                  <span className="text-[10px] text-emerald-400 font-mono font-normal">demxanh.com</span>
+                </h4>
+                <div className="bg-slate-900 p-3 rounded-2xl border border-slate-800 space-y-1.5 text-xs">
+                  <div className="flex items-center gap-1.5 text-emerald-400 font-bold">
+                    <Globe className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">{activeConv.currentProduct || 'Trang chủ Đệm Xanh'}</span>
+                  </div>
+                  <div className="text-[11px] text-slate-400 pt-0.5">
+                    <a
+                      href={
+                        activeConv.currentPage.startsWith('http')
+                          ? activeConv.currentPage
+                          : `https://demxanh.com${activeConv.currentPage}`
+                      }
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-cyan-400 hover:text-cyan-300 underline inline-flex items-center gap-1 font-mono break-all text-[10px]"
+                    >
+                      <span>
+                        {activeConv.currentPage.startsWith('http')
+                          ? activeConv.currentPage
+                          : `https://demxanh.com${activeConv.currentPage}`}
+                      </span>
+                      <ExternalLink className="w-2.5 h-2.5 shrink-0" />
+                    </a>
                   </div>
                 </div>
               </div>

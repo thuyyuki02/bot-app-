@@ -63,7 +63,7 @@ export const MasterTopNav: React.FC = () => {
             }`}
           >
             <Globe className="w-4 h-4" />
-            <span>Customer Website</span>
+            <span>Thử Nghiệm Widget (Website)</span>
           </button>
 
           <button
@@ -75,7 +75,7 @@ export const MasterTopNav: React.FC = () => {
             }`}
           >
             <Headphones className="w-4 h-4" />
-            <span>Staff UI</span>
+            <span>Nhân Viên Showroom</span>
             {waitingAgentCount > 0 && (
               <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping absolute -top-1 -right-1" />
             )}
@@ -95,7 +95,7 @@ export const MasterTopNav: React.FC = () => {
             }`}
           >
             <Sliders className="w-4 h-4" />
-            <span>Admin Platform</span>
+            <span>Quản Trị AI & Dữ Liệu DemXanh</span>
             {hotLeadsCount > 0 && (
               <span className="bg-rose-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-bold ml-1 flex items-center gap-0.5">
                 <Flame className="w-2.5 h-2.5 inline" /> {hotLeadsCount}

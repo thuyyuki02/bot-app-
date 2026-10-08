@@ -38,7 +38,9 @@ interface AppContextType {
   activeView: AppView;
   setActiveView: (view: AppView) => void;
   currentPage: string;
-  setCurrentPage: (page: string) => void;
+  currentPageTitle: string;
+  setCurrentPage: (page: string, title?: string) => void;
+  setCurrentPageTitle: (title: string) => void;
   isMobilePreview: boolean;
   setIsMobilePreview: (val: boolean) => void;
   isEventLoggerOpen: boolean;
@@ -102,9 +104,42 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [activeView, setActiveView] = useState<AppView>('customer');
-  const [currentPage, setCurrentPage] = useState<string>('/dem-lo-xo-dunlopillo-audrey');
+  const [currentPage, setCurrentPageRaw] = useState<string>('/dem-lo-xo-dunlopillo-audrey');
+  const [currentPageTitle, setCurrentPageTitle] = useState<string>('Đệm lò xo Dunlopillo Audrey 25cm');
   const [isMobilePreview, setIsMobilePreview] = useState<boolean>(false);
   const [isEventLoggerOpen, setIsEventLoggerOpen] = useState<boolean>(false);
+
+  const setCurrentPage = (page: string, title?: string) => {
+    setCurrentPageRaw(page);
+    let derivedTitle = title;
+    if (!derivedTitle) {
+      const clean = page
+        .replace(/^https?:\/\/[^/]+/i, '')
+        .replace(/\.html?$/i, '')
+        .replace(/^[/-]+/, '')
+        .replace(/[-_]/g, ' ')
+        .trim();
+      derivedTitle = clean
+        ? clean.split(' ').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+        : 'Trang chủ Đệm Xanh';
+    }
+    setCurrentPageTitle(derivedTitle);
+
+    // Sync to active customer live conversation for staff workspace
+    setConversations((prev) =>
+      prev.map((c) => {
+        if (c.id === activeCustomerConvId || c.id === 'conv-customer-live') {
+          return {
+            ...c,
+            currentPage: page,
+            currentProduct: derivedTitle,
+            pageType: page.includes('cart') ? 'cart' : page === '/' || !page ? 'home' : 'product',
+          };
+        }
+        return c;
+      })
+    );
+  };
 
   const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
   const [knowledgeItems, setKnowledgeItems] = useState<KnowledgeItem[]>(INITIAL_KNOWLEDGE);
@@ -232,7 +267,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           message: text,
           history: (targetConv?.messages || []).slice(-6),
           systemPrompt: aiConfig.systemPrompt,
-          currentPageContext: currentPage,
+          currentPageContext: `${currentPage} (Sản phẩm đang xem: ${currentPageTitle || 'Trang chủ Đệm Xanh'})`,
           customerProfile: targetConv?.consultationData,
         }),
       });
@@ -668,7 +703,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         activeView,
         setActiveView,
         currentPage,
+        currentPageTitle,
         setCurrentPage,
+        setCurrentPageTitle,
         isMobilePreview,
         setIsMobilePreview,
         isEventLoggerOpen,

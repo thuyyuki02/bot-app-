@@ -23,7 +23,7 @@ import {
   Flame,
 } from 'lucide-react';
 
-export const ChatWidget: React.FC = () => {
+export const ChatWidget: React.FC<{ isEmbed?: boolean }> = ({ isEmbed = false }) => {
   const {
     appearance,
     conversations,
@@ -35,6 +35,7 @@ export const ChatWidget: React.FC = () => {
     resetCustomerChat,
     products,
     currentPage,
+    currentPageTitle,
     setCurrentPage,
     isMobilePreview,
     takeoverConversation,
@@ -45,6 +46,32 @@ export const ChatWidget: React.FC = () => {
   const [isMinimized, setIsMinimized] = useState<boolean>(false);
   const [inputText, setInputText] = useState<string>('');
   const [isTyping, setIsTyping] = useState<boolean>(false);
+
+  // Listen for parent page context when embedded in external website (demxanh.com)
+  useEffect(() => {
+    // 1. Parse initial context from URL query params
+    if (typeof window !== 'undefined') {
+      const searchParams = new URLSearchParams(window.location.search);
+      const urlParam = searchParams.get('pageUrl');
+      const prodParam = searchParams.get('productName') || searchParams.get('title');
+      if (urlParam) {
+        setCurrentPage(urlParam, prodParam || undefined);
+      }
+      // Request fresh context from host page if needed
+      try {
+        window.parent.postMessage({ type: 'DX_REQUEST_PAGE_CONTEXT' }, '*');
+      } catch (e) {}
+    }
+
+    // 2. Real-time updates from parent window (demxanh.com) via postMessage
+    const handleMsg = (e: MessageEvent) => {
+      if (e.data?.type === 'DX_PAGE_VIEW' && e.data.pageUrl) {
+        setCurrentPage(e.data.pageUrl, e.data.productName || e.data.pageTitle);
+      }
+    };
+    window.addEventListener('message', handleMsg);
+    return () => window.removeEventListener('message', handleMsg);
+  }, [setCurrentPage]);
 
   // Proactive greeting bubble state
   const [showProactiveBubble, setShowProactiveBubble] = useState<boolean>(false);
@@ -232,7 +259,9 @@ export const ChatWidget: React.FC = () => {
       {isOpen && (
         <div
           className={`fixed z-40 bg-white shadow-2xl flex flex-col border border-slate-200 transition-all duration-300 ${
-            isMobilePreview
+            isEmbed
+              ? 'inset-0 w-full h-full rounded-none overflow-hidden'
+              : isMobilePreview
               ? 'inset-0 w-full h-full rounded-none'
               : `bottom-6 ${
                   appearance.position === 'left' ? 'left-6' : 'right-6'
@@ -272,14 +301,30 @@ export const ChatWidget: React.FC = () => {
                 <RotateCcw className="w-4 h-4" />
               </button>
               <button
-                onClick={() => setIsMinimized(!isMinimized)}
+                onClick={() => {
+                  if (isEmbed) {
+                    try {
+                      window.parent.postMessage({ type: 'DX_CLOSE_WIDGET' }, '*');
+                    } catch (e) {}
+                  } else {
+                    setIsMinimized(!isMinimized);
+                  }
+                }}
                 title="Thu nhỏ"
                 className="p-1.5 text-emerald-100 hover:text-white hover:bg-white/10 rounded-lg transition"
               >
                 <Minus className="w-4 h-4" />
               </button>
               <button
-                onClick={() => setIsOpen(false)}
+                onClick={() => {
+                  if (isEmbed) {
+                    try {
+                      window.parent.postMessage({ type: 'DX_CLOSE_WIDGET' }, '*');
+                    } catch (e) {}
+                  } else {
+                    setIsOpen(false);
+                  }
+                }}
                 title="Đóng chat"
                 className="p-1.5 text-emerald-100 hover:text-white hover:bg-white/10 rounded-lg transition"
               >
@@ -301,23 +346,34 @@ export const ChatWidget: React.FC = () => {
             </div>
           ) : (
             <>
-              {/* C12 Context awareness banner */}
-              <div className="bg-emerald-50/80 px-3 py-1.5 border-b border-emerald-100 text-[11px] text-emerald-800 flex items-center justify-between">
-                <div className="flex items-center gap-1.5 truncate">
-                  <span className="font-semibold">Đang xem:</span>
-                  <span className="truncate max-w-[200px] text-emerald-950 font-medium">
-                    {currentPage.replace('/', '').replace(/-/g, ' ') || 'Trang chủ'}
+              {/* C12 Context awareness banner: Tự động nhận diện link sản phẩm đang xem */}
+              <div className="bg-emerald-50/95 px-3.5 py-2 border-b border-emerald-100 text-[11px] text-emerald-800 flex items-center justify-between gap-2 shadow-xs">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 animate-pulse"></span>
+                  <span className="font-semibold text-emerald-900 shrink-0">Đang xem:</span>
+                  <span
+                    title={currentPageTitle || currentPage}
+                    className="truncate max-w-[200px] text-emerald-950 font-bold"
+                  >
+                    {currentPageTitle ||
+                      currentPage
+                        .replace(/^https?:\/\/[^/]+/i, '')
+                        .replace(/\.html?/i, '')
+                        .replace(/^[/-]+/, '')
+                        .replace(/[-_]/g, ' ') ||
+                      'Trang chủ'}
                   </span>
                 </div>
                 <button
                   onClick={() =>
                     sendCustomerMessage(
-                      `Tư vấn giúp tôi mẫu đệm ${currentPage.replace('/', '').replace(/-/g, ' ')} này nhé!`
+                      `Tư vấn giúp tôi mẫu đệm ${currentPageTitle || 'sản phẩm này'} (link: ${currentPage}) với ạ!`
                     )
                   }
-                  className="text-[10px] text-emerald-700 font-bold hover:underline shrink-0"
+                  className="text-[10px] bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-2.5 py-1 rounded-full transition shrink-0 shadow-xs flex items-center gap-1"
                 >
-                  Hỏi mẫu này &gt;
+                  <span>Hỏi mẫu này</span>
+                  <ChevronRight className="w-3 h-3" />
                 </button>
               </div>
 
