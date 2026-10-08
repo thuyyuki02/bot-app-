@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Product, ConsultationAnswers } from '../../types';
+import { resolveContextualTargetProduct } from '../../services/contextResolver';
 import {
   MessageSquare,
   X,
@@ -107,6 +108,16 @@ export const ChatWidget: React.FC<{ isEmbed?: boolean }> = ({ isEmbed = false })
   // Current active conversation
   const currentConv = conversations.find((c) => c.id === activeCustomerConvId) || conversations[0];
   const messages = currentConv?.messages || [];
+
+  // Dynamic context resolution for accurate product awareness & suggestion chips
+  const currentContextRes = resolveContextualTargetProduct({
+    message: inputText,
+    history: messages,
+    currentPageContext: `${currentPage} (Sản phẩm: ${currentPageTitle || ''})`,
+    catalog: products,
+  });
+  const currentFocal = currentContextRes.focalProduct;
+  const suggestedChips = currentContextRes.suggestedChips;
 
   // Auto scroll to bottom
   useEffect(() => {
@@ -352,25 +363,22 @@ export const ChatWidget: React.FC<{ isEmbed?: boolean }> = ({ isEmbed = false })
                   <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 animate-pulse"></span>
                   <span className="font-semibold text-emerald-900 shrink-0">Đang xem:</span>
                   <span
-                    title={currentPageTitle || currentPage}
-                    className="truncate max-w-[200px] text-emerald-950 font-bold"
+                    title={currentFocal.name}
+                    className="truncate max-w-[170px] text-emerald-950 font-bold"
                   >
-                    {currentPageTitle ||
-                      currentPage
-                        .replace(/^https?:\/\/[^/]+/i, '')
-                        .replace(/\.html?/i, '')
-                        .replace(/^[/-]+/, '')
-                        .replace(/[-_]/g, ' ') ||
-                      'Trang chủ'}
+                    {currentFocal.name}
+                  </span>
+                  <span className="shrink-0 bg-emerald-200/80 text-emerald-900 text-[10px] font-bold px-1.5 py-0.5 rounded">
+                    {currentFocal.salePrice.toLocaleString('vi-VN')}đ
                   </span>
                 </div>
                 <button
                   onClick={() =>
                     sendCustomerMessage(
-                      `Tư vấn giúp tôi mẫu đệm ${currentPageTitle || 'sản phẩm này'} (link: ${currentPage}) với ạ!`
+                      `Mẫu ${currentFocal.name} này đang có giá khuyến mãi và quà tặng gì thế em?`
                     )
                   }
-                  className="text-[10px] bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-2.5 py-1 rounded-full transition shrink-0 shadow-xs flex items-center gap-1"
+                  className="text-[10px] bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-2.5 py-1 rounded-full transition shrink-0 shadow-xs flex items-center gap-1 cursor-pointer"
                 >
                   <span>Hỏi mẫu này</span>
                   <ChevronRight className="w-3 h-3" />
@@ -767,6 +775,22 @@ export const ChatWidget: React.FC<{ isEmbed?: boolean }> = ({ isEmbed = false })
 
                 <div ref={messagesEndRef} />
               </div>
+
+              {/* Contextual Quick Suggestion Chips */}
+              {suggestedChips && suggestedChips.length > 0 && (
+                <div className="px-3 py-1.5 bg-slate-50/90 border-t border-slate-200/80 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+                  {suggestedChips.map((chip, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => sendCustomerMessage(chip)}
+                      className="whitespace-nowrap px-2.5 py-1 bg-white hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 border border-slate-200 hover:border-emerald-300 rounded-full transition text-[11px] font-medium shadow-2xs shrink-0 cursor-pointer"
+                    >
+                      {chip}
+                    </button>
+                  ))}
+                </div>
+              )}
 
               {/* Message Input Bar */}
               <form

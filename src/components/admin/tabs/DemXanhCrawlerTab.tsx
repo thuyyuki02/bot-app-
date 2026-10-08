@@ -358,24 +358,33 @@ export const DemXanhCrawlerTab: React.FC = () => {
 
         {/* Suggestion prompt chips */}
         <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-400 mb-4">
-          <span>Câu hỏi gợi ý:</span>
+          <span className="font-semibold text-slate-300">Thử nghiệm theo đúng ngữ cảnh trang:</span>
           <button
-            onClick={() => setTestQuestion('Đệm Dunlopillo Audrey kích thước 1m8x2m giá bao nhiêu và có quà tặng gì?')}
-            className="px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-700 text-slate-300 border border-slate-700 text-[11px]"
+            onClick={() => {
+              setSimulatedPageContext('https://demxanh.com/dem-lo-xo-dunlopillo-audrey-1.html');
+              setTestQuestion('Mẫu này giá bao nhiêu và bảo hành mấy năm thế em?');
+            }}
+            className="px-2.5 py-1 rounded-lg bg-emerald-950/60 hover:bg-emerald-900 text-emerald-300 border border-emerald-700/60 text-[11px] font-medium transition cursor-pointer"
           >
-            Dunlopillo Audrey giá bao nhiêu?
+            Audrey: "Mẫu này giá & bảo hành bao lâu?"
           </button>
           <button
-            onClick={() => setTestQuestion('Tôi bị thoái hóa đốt sống lưng thì nên chọn đệm cao su Kim Cương hay Liên Á?')}
-            className="px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-700 text-slate-300 border border-slate-700 text-[11px]"
+            onClick={() => {
+              setSimulatedPageContext('https://demxanh.com/dem-cao-su-kim-cuong-happy-gold.html');
+              setTestQuestion('Đệm này dày mấy phân, người bị đau cột sống nằm có tốt không?');
+            }}
+            className="px-2.5 py-1 rounded-lg bg-teal-950/60 hover:bg-teal-900 text-teal-300 border border-teal-700/60 text-[11px] font-medium transition cursor-pointer"
           >
-            Đau lưng chọn đệm nào?
+            Happy Gold: "Đệm này dày mấy phân & đau lưng?"
           </button>
           <button
-            onClick={() => setTestQuestion('Mua đệm tại Đệm Xanh có được miễn phí vận chuyển lên chung cư không?')}
-            className="px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-700 text-slate-300 border border-slate-700 text-[11px]"
+            onClick={() => {
+              setSimulatedPageContext('https://demxanh.com/dem-bong-ep-song-hong-the-he-3.html');
+              setTestQuestion('Mẫu này giá bao nhiêu, có gập gọn được không và ship về Cầu Giấy mất bao lâu?');
+            }}
+            className="px-2.5 py-1 rounded-lg bg-cyan-950/60 hover:bg-cyan-900 text-cyan-300 border border-cyan-700/60 text-[11px] font-medium transition cursor-pointer"
           >
-            Hỏi giao hàng & chung cư
+            Sông Hồng TH3: "Giá & Gập gọn & Ship?"
           </button>
         </div>
 

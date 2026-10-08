@@ -9,6 +9,7 @@ import {
   DEMXANH_CORE_POLICIES,
   extractProductFromDemXanhUrl,
 } from './src/services/crawlerService.js';
+import { resolveContextualTargetProduct } from './src/services/contextResolver.js';
 
 dotenv.config();
 
@@ -145,28 +146,41 @@ async function startServer() {
 
       const activeCatalog = catalog && Array.isArray(catalog) && catalog.length > 0 ? catalog : learnedProducts;
 
-      // Find matching products from knowledge base
-      const lower = message.toLowerCase();
-      const matchedProducts = activeCatalog.filter(
-        (p: any) =>
-          lower.includes(p.name.toLowerCase()) ||
-          lower.includes(p.brand.toLowerCase()) ||
-          lower.includes(p.category.toLowerCase()) ||
-          currentPageContext.toLowerCase().includes(p.name.toLowerCase()) ||
-          (lower.includes('đau lưng') && (p.category === 'Đệm cao su' || p.name.includes('Audrey')))
-      );
+      // Resolve focal product with multi-tier context awareness
+      const contextRes = resolveContextualTargetProduct({
+        message,
+        history,
+        currentPageContext,
+        customerProfile,
+        catalog: activeCatalog,
+      });
 
-      // Build product reference context for prompt
-      const productContextStr = (matchedProducts.length > 0 ? matchedProducts.slice(0, 4) : activeCatalog.slice(0, 4))
-        .map(
+      const focalProduct = contextRes.focalProduct;
+      const isFromPage = contextRes.contextType === 'page_product';
+      const isFromHistory = contextRes.contextType === 'history_product';
+      const contextExplanation = contextRes.explanation;
+
+      // Build product reference context for prompt (focal product is strictly Priority #1)
+      const otherProducts = activeCatalog.filter((p: any) => p.id !== focalProduct.id).slice(0, 3);
+      const productContextStr = [
+        `[SẢN PHẨM TRỌNG TÂM CỦA NGỮ CẢNH HIỆN TẠI - ƯU TIÊN 1]:\n` +
+          `- Tên: ${focalProduct.name} | Hãng: ${focalProduct.brand} | Danh mục: ${focalProduct.category} | SKU: ${focalProduct.sku}\n` +
+          `- Giá KM: ${focalProduct.salePrice?.toLocaleString('vi-VN')}đ (Giá niêm yết: ${focalProduct.originalPrice?.toLocaleString(
+            'vi-VN'
+          )}đ - Tiết kiệm: ${(focalProduct.originalPrice - focalProduct.salePrice)?.toLocaleString('vi-VN')}đ)\n` +
+          `- Độ dày chuẩn: ${focalProduct.thickness} | Độ cứng/êm: ${focalProduct.firmness}\n` +
+          `- Kích thước tiêu chuẩn: ${(focalProduct.dimensions || []).join(', ')}\n` +
+          `- Thời gian bảo hành chính hãng: ${focalProduct.warrantyYears} năm\n` +
+          `- Chất liệu: ${focalProduct.material}\n` +
+          `- Tính năng nổi bật & Y khoa: ${(focalProduct.features || []).join('; ')}\n` +
+          `- Mô tả: ${focalProduct.description || ''}`,
+        ...otherProducts.map(
           (p: any) =>
-            `- Tên: ${p.name} | Hãng: ${p.brand} | Danh mục: ${p.category} | Giá KM: ${p.salePrice?.toLocaleString(
+            `[SẢN PHẨM THAM KHẢO/SO SÁNH]: Tên: ${p.name} | Hãng: ${p.brand} | Giá KM: ${p.salePrice?.toLocaleString(
               'vi-VN'
-            )}đ (Giá gốc: ${p.originalPrice?.toLocaleString('vi-VN')}đ) | Bảo hành: ${p.warrantyYears} năm | Chất liệu: ${
-              p.material
-            } | Ưu điểm: ${(p.features || []).join('; ')}`
-        )
-        .join('\n');
+            )}đ | Độ dày: ${p.thickness} | Bảo hành: ${p.warrantyYears} năm | Chất liệu: ${p.material}`
+        ),
+      ].join('\n\n');
 
       const policiesContextStr = learnedPolicies.map((p) => `- ${p.title}: ${p.content}`).join('\n');
 
@@ -181,9 +195,14 @@ async function startServer() {
               role: 'user',
               parts: [
                 {
-                  text: `DỮ LIỆU SẢN PHẨM TRÍ TUỆ NHÂN TẠO CÀO TỪ DEMXANH.COM:\n${productContextStr}\n\nCHÍNH SÁCH ĐỆM XANH:\n${policiesContextStr}\n\nNGỮ CẢNH TRANG KHÁCH ĐANG XEM TRÊN WEBSITE DEMXANH.COM:\n${currentPageContext}\n\nTHÔNG TIN KHÁCH HÀNG: ${JSON.stringify(
-                    customerProfile || {}
-                  )}\n\nCÂU HỎI CỦA KHÁCH: "${message}"`,
+                  text: `BỐI CẢNH & DỮ LIỆU ĐỐI SOÁT TỪ DEMXANH.COM:\n` +
+                    `NGỮ CẢNH TRANG KHÁCH ĐANG XEM TRÊN WEBSITE: "${currentPageContext}"\n` +
+                    `SẢN PHẨM TRỌNG TÂM XÁC ĐỊNH: "${focalProduct.name}"\n` +
+                    `TRẠNG THÁI NGỮ CẢNH: ${contextExplanation}\n\n` +
+                    `DỮ LIỆU SẢN PHẨM DEMXANH.COM:\n${productContextStr}\n\n` +
+                    `CHÍNH SÁCH ĐỆM XANH:\n${policiesContextStr}\n\n` +
+                    `THÔNG TIN KHÁCH HÀNG: ${JSON.stringify(customerProfile || {})}\n\n` +
+                    `CÂU HỎI MỚI NHẤT CỦA KHÁCH: "${message}"`,
                 },
               ],
             },
@@ -195,13 +214,26 @@ async function startServer() {
             config: {
               systemInstruction:
                 systemPrompt ||
-                `Bạn là trợ lý AI tư vấn nệm độc quyền của Đệm Xanh (demxanh.com), hotline 0962 701 701.
-NHIỆM VỤ CỐT LÕI:
-1. Dựa trên dữ liệu sản phẩm vừa cào và học từ demxanh.com để trả lời chính xác 100% về giá tiền (VNĐ), kích thước, độ cứng/êm và bảo hành.
-2. Nếu khách đang ở trên một đường link hoặc xem sản phẩm cụ thể (được nêu trong "Ngữ cảnh trang"), hãy ưu tiên tư vấn sâu về sản phẩm đó trước.
-3. Luôn nhiệt tình, tư vấn chuẩn y khoa (đặc biệt các bệnh lý đau thắt lưng, thoát vị đĩa đệm, người lớn tuổi, giấc ngủ vợ chồng).
-4. Nhắc đến ưu đãi độc quyền tại Đệm Xanh: Miễn phí vận chuyển 30km, tặng combo 2 gối, 30 đêm ngủ thử đổi mới miễn phí.
-5. Giữ giọng văn thân thiện, xưng "Em" gọi "Anh/Chị".`,
+                `Bạn là Trợ lý AI tư vấn nệm độc quyền của Hệ thống Đệm Xanh (demxanh.com), hotline 0962 701 701.
+
+QUY TẮC BẮT BUỘC VỀ NGỮ CẢNH (CONTEXT-STRICT RULES):
+1. ĐÚNG ĐỐI TƯỢNG VÀ SẢN PHẨM ĐANG XEM:
+   - Khách đang xem trang: "${currentPageContext}".
+   - Sản phẩm trọng tâm được xác định: "${focalProduct.name}".
+   - ${contextExplanation}
+   - Khi khách dùng các đại từ chỉ định ("mẫu này", "đệm này", "cái này", "sản phẩm này", hoặc các câu hỏi không nhắc tên đệm như "giá bao nhiêu", "bảo hành thế nào", "dày mấy phân", "nằm có bị đau lưng không", "có quà tặng không", "có giao về Cầu Giấy không"): BẠN PHẢI 100% HIỂU VÀ TRẢ LỜI CHÍNH XÁC VỀ "${focalProduct.name}". Tuyệt đối không được hỏi lại "anh/chị đang hỏi mẫu nào" và không được trả lời sang mẫu đệm khác!
+
+2. LIÊN TỤC VÀ NHẤT QUÁN VỚI LỊCH SỬ HỘI THOẠI (CONVERSATION CONTINUITY):
+   - Đọc kỹ lịch sử chat trước đó. Nếu ở tin nhắn trước khách đã chia sẻ thông tin (như: mua cho bố mẹ 70 tuổi bị đau lưng, giường kích thước 1m8x2m, ngân sách 7 triệu...), bạn phải nhớ và duy trì ngữ cảnh này trong câu trả lời tiếp theo.
+
+3. ĐỐI SOÁT DỮ LIỆU CHÍNH XÁC 100% TỪ DEMXANH.COM:
+   - Báo đúng giá khuyến mãi (VNĐ), đúng độ dày chuẩn, đúng độ cứng/êm và thời gian bảo hành chính hãng từ catalog được cung cấp.
+   - Nhắc quà tặng độc quyền tại Đệm Xanh: Combo 2 ruột gối cao cấp + ga chống thấm.
+   - Chính sách đặc quyền: 30 đêm ngủ thử đổi mới miễn phí tại nhà, Miễn phí vận chuyển 30km tận phòng ngủ.
+   - Hotline: 0962 701 701.
+
+4. PHONG CÁCH TƯ VẤN:
+   - Lễ phép, xưng "Em", gọi "Anh/Chị". Chuẩn y khoa, ngắn gọn, súc tích, chuyên nghiệp.`,
               temperature: 0.25,
             },
           });
@@ -213,62 +245,47 @@ NHIỆM VỤ CỐT LÕI:
           const response = (await Promise.race([generatePromise, timeoutPromise])) as any;
           const replyText = response.text || '';
           if (replyText.trim()) {
-            return res.json({ text: replyText, source: 'gemini' });
+            return res.json({
+              text: replyText,
+              source: 'gemini',
+              detectedIntent: contextRes.detectedIntent,
+              scoreIncrement: 15,
+              matchedProducts: [focalProduct],
+            });
           }
         } catch (apiError: any) {
           console.warn('Gemini API call failed, falling back to local engine:', apiError?.message || apiError);
         }
       }
 
-      // Local intelligent response fallback
+      // Local intelligent response fallback (also 100% context-faithful)
+      const lower = message.toLowerCase();
       let fallbackText = '';
-      let detectedIntent = 'general';
-      let scoreIncrement = 5;
+      let detectedIntent = contextRes.detectedIntent;
+      let scoreIncrement = 15;
 
-      const topProduct = matchedProducts[0] || activeCatalog[0];
-
-      if (lower.includes('giá') || lower.includes('bao nhiêu') || lower.includes('triệu')) {
-        detectedIntent = 'Hỏi giá';
-        scoreIncrement = 15;
-        if (topProduct) {
-          fallbackText = `Dạ hiện tại mẫu ${topProduct.name} tại Đệm Xanh đang có giá khuyến mãi chỉ ${topProduct.salePrice.toLocaleString(
-            'vi-VN'
-          )}đ (giá niêm yết ${topProduct.originalPrice.toLocaleString('vi-VN')}đ), tiết kiệm ${(
-            topProduct.originalPrice - topProduct.salePrice
-          ).toLocaleString('vi-VN')}đ. Đệm được bảo hành chính hãng ${topProduct.warrantyYears} năm và tặng kèm 2 ruột gối cao cấp. Anh/chị cần kích thước nào (1m6x2m, 1m8x2m hay 2mx2m2) để em chốt giá chuẩn nhất nhé!`;
-        } else {
-          fallbackText =
-            'Dạ hiện tại Đệm Xanh đang có chương trình khuyến mãi giảm từ 15% - 25% kèm combo quà tặng ruột gối trị giá 1.800.000đ cho tất cả các dòng đệm lò xo và cao su thiên nhiên. Anh/chị đang quan tâm cụ thể dòng đệm nào (Dunlopillo, Liên Á hay Kim Cương) để em gửi bảng giá ưu đãi theo kích thước chuẩn nhé!';
-        }
+      if (lower.includes('giá') || lower.includes('bao nhiêu') || lower.includes('tiền') || lower.includes('khuyến mãi')) {
+        detectedIntent = 'Hỏi giá & Khuyến mãi';
+        const discount = focalProduct.originalPrice - focalProduct.salePrice;
+        fallbackText = `Dạ hiện tại mẫu **${focalProduct.name}** tại Hệ thống Đệm Xanh (demxanh.com) đang có giá khuyến mãi chỉ ${focalProduct.salePrice.toLocaleString(
+          'vi-VN'
+        )}đ (giá niêm yết ${focalProduct.originalPrice.toLocaleString('vi-VN')}đ, tiết kiệm ${discount.toLocaleString(
+          'vi-VN'
+        )}đ).\n\n• Quà tặng: Tặng combo 2 ruột gối cao cấp + ga chống thấm.\n• Bảo hành: Chính hãng ${focalProduct.warrantyYears} năm.\n• Đặc quyền: 30 đêm ngủ thử đổi mới miễn phí + Miễn phí vận chuyển 30km tận phòng.\n\nAnh/chị cần kích thước nào (1m6x2m, 1m8x2m hay 2mx2m2) để em báo giá chuẩn nhất ạ?`;
+      } else if (lower.includes('dày') || lower.includes('chiều cao') || lower.includes('phân') || lower.includes('cm')) {
+        detectedIntent = 'Hỏi độ dày & Kích thước';
+        fallbackText = `Dạ mẫu **${focalProduct.name}** có độ dày chuẩn là **${focalProduct.thickness}**, chất liệu ${focalProduct.material}. Kích thước chuẩn sẵn hàng: ${(focalProduct.dimensions || []).join(', ')}. Giường của anh/chị là kích thước nào để em kiểm tra kho ạ?`;
       } else if (lower.includes('đau lưng') || lower.includes('thoát vị') || lower.includes('cột sống')) {
         detectedIntent = 'Tư vấn y khoa / Đau lưng';
-        scoreIncrement = 20;
-        fallbackText =
-          'Dạ với tình trạng đau thắt lưng hoặc thoái hóa cột sống, lời khuyên y khoa là không nên nằm đệm quá lún võng cũng không nên nằm phản quá cứng. Lựa chọn tốt nhất hiện nay trên demxanh.com là Đệm cao su thiên nhiên Kim Cương Happy Gold (giá ưu đãi 6.517.000đ, độ cứng chuẩn y khoa) hoặc Đệm lò xo Dunlopillo Audrey nâng đỡ phân vùng. Em gửi thông tin 2 mẫu này để mình xem thử nhé!';
+        fallbackText = `Dạ về nâng đỡ cột sống: Mẫu **${focalProduct.name}** có độ nâng đỡ ${focalProduct.firmness}, chất liệu ${focalProduct.material}. Đặc tính: ${(focalProduct.features || []).slice(0, 2).join('; ')}. Đệm giữ cột sống thẳng tự nhiên khi nằm, rất tốt cho người đau lưng. Đệm Xanh có chính sách 30 đêm ngủ thử miễn phí tại nhà để anh/chị trải nghiệm ạ!`;
+      } else if (lower.includes('bảo hành') || lower.includes('đổi') || lower.includes('ngủ thử')) {
+        detectedIntent = 'Chính sách bảo hành & Ngủ thử';
+        fallbackText = `Dạ mẫu **${focalProduct.name}** được bảo hành chính hãng **${focalProduct.warrantyYears} năm** chống xẹp lún. Quý khách được áp dụng chính sách độc quyền **30 đêm ngủ thử miễn phí**, đổi mới nếu không hợp độ cứng/êm ạ!`;
       } else if (lower.includes('giao hàng') || lower.includes('ship') || lower.includes('vận chuyển')) {
         detectedIntent = 'Hỏi giao hàng';
-        scoreIncrement = 10;
-        fallbackText =
-          'Dạ Đệm Xanh MIỄN PHÍ 100% phí giao hàng và bưng vác lên tận phòng ngủ trong bán kính 30km từ hệ thống showroom Hà Nội, TP.HCM và Hải Phòng ạ. Đơn nội thành giao hỏa tốc chỉ trong 2-4 giờ. Anh/chị đang ở quận/huyện nào ạ?';
-      } else if (lower.includes('nhân viên') || lower.includes('người thật') || lower.includes('tư vấn viên')) {
-        detectedIntent = 'Yêu cầu gặp nhân viên';
-        scoreIncrement = 25;
-        fallbackText =
-          'Dạ em hiểu rồi ạ! Em đang kết nối chuyên viên bán hàng trực tiếp của Đệm Xanh qua hotline 0962 701 701 hoặc hỗ trợ ngay trong khung chat này. Anh/chị đợi giây lát nhé!';
-      } else if (
-        lower.includes('mua') ||
-        lower.includes('đặt') ||
-        lower.includes('sđt') ||
-        lower.includes('09') ||
-        lower.includes('03') ||
-        lower.includes('08')
-      ) {
-        detectedIntent = 'Ý định mua hàng';
-        scoreIncrement = 30;
-        fallbackText =
-          'Dạ tuyệt vời ạ! Em đã ghi nhận thông tin của anh/chị. Chuyên viên Đệm Xanh sẽ liên hệ lại ngay trong ít phút để xác nhận kích thước đệm, quà tặng kèm và lịch hẹn giao hàng thuận tiện nhất cho mình ạ!';
+        fallbackText = `Dạ Đệm Xanh MIỄN PHÍ 100% phí giao hàng và hỗ trợ kê đệm tận phòng ngủ trong bán kính 30km từ hệ thống showroom Hà Nội, TP.HCM và Hải Phòng ạ. Giao hỏa tốc 2-4 giờ. Anh/chị đang ở quận/huyện nào ạ?`;
       } else {
-        fallbackText = `Dạ em là trợ lý AI Đệm Xanh (demxanh.com). Em có thể báo giá nhanh các mẫu đệm cao su Kim Cương, Liên Á, đệm lò xo Dunlopillo, hoặc tư vấn loại đệm phù hợp với thể trạng lưng và không gian phòng của anh/chị. Anh/chị muốn xem mẫu nào ạ?`;
+        fallbackText = `Dạ em là trợ lý tư vấn AI Đệm Xanh (demxanh.com), hotline 0962 701 701. Em thấy anh/chị đang quan tâm mẫu **${focalProduct.name}** (${focalProduct.salePrice.toLocaleString('vi-VN')}đ, bảo hành ${focalProduct.warrantyYears} năm, quà tặng 2 gối cao cấp). Anh/chị cần em hỗ trợ kích thước, báo giá hay tư vấn độ êm nâng đỡ lưng ạ?`;
       }
 
       return res.json({
@@ -276,6 +293,7 @@ NHIỆM VỤ CỐT LÕI:
         source: 'local_engine',
         detectedIntent,
         scoreIncrement,
+        matchedProducts: [focalProduct],
       });
     } catch (err: any) {
       console.error('Error handling chat:', err);
